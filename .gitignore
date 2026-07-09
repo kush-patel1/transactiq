@@ -1,0 +1,31 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# build
+dist
+dist-ssr
+*.local
+
+# env — never commit real Firebase / API keys
+.env
+.env.*
+!.env.example
+
+# editor / os
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.log
+npm-debug.log*
+
+# firebase
+.firebase
+firebase-debug.log
+
+# tsc -b artifacts from tsconfig.node.json
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo
