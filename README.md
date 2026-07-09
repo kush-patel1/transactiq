@@ -1,10 +1,21 @@
 # TransactIQ
 
-A point-of-sale for small businesses with a **margin-aware intelligence layer**.
-It captures your true cost at receiving (via AI invoice scanning) so it can show
-you real profit — not just sales.
+A point-of-sale for convenience & liquor stores with a **margin-aware
+intelligence layer**. It captures your true cost at receiving (via AI invoice
+scanning) so it can show you real profit — not just sales.
+
+**Live demo:** https://kush-patel1.github.io/transactiq/
 
 > Firebase project: `transactiq-746f9`
+
+## Deployment
+
+Every push to `main` auto-deploys to GitHub Pages via
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml):
+the workflow builds with `--base=/<repo>/` (project sites live on a subpath),
+copies `index.html` → `404.html` so deep links like `/demo` survive refreshes,
+and publishes `dist/` with `actions/deploy-pages`. The router picks up the
+subpath automatically via `basename={import.meta.env.BASE_URL}`.
 
 ## Quick start
 
