@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Register from '../components/Register'
 import Receiving from '../components/Receiving'
+import Inventory from '../components/Inventory'
 import Dashboard from '../components/Dashboard'
 import BackOffice from '../components/BackOffice'
 import { StoreProvider, useStore } from '../lib/store'
 import { STORE_NAME } from '../lib/seed'
 import type { Role, User } from '../lib/types'
 
-type Tab = 'register' | 'receiving' | 'dashboard' | 'backoffice'
+type Tab = 'register' | 'receiving' | 'inventory' | 'dashboard' | 'backoffice'
 
 const TABS: { id: Tab; label: string; roles: Role[] }[] = [
   { id: 'register', label: 'Register', roles: ['owner', 'cashier'] },
   { id: 'receiving', label: 'Receiving', roles: ['owner', 'cashier'] },
+  { id: 'inventory', label: 'Inventory', roles: ['owner'] },
   { id: 'dashboard', label: 'Dashboard', roles: ['owner'] },
   { id: 'backoffice', label: 'Back Office', roles: ['owner'] },
 ]
@@ -83,6 +85,7 @@ function DemoShell() {
       <div className="demo-body">
         {tab === 'register' && <Register />}
         {tab === 'receiving' && <Receiving />}
+        {tab === 'inventory' && <Inventory />}
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'backoffice' && <BackOffice />}
       </div>

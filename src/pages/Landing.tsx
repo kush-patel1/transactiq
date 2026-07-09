@@ -51,7 +51,7 @@ const ICONS = {
 const FEATURES = [
   { ico: ICONS.invoice, title: 'AI Receiving', body: 'Snap a supplier invoice. TransactIQ reads it, matches each line to your catalog, and updates stock — capturing your true cost automatically.' },
   { ico: ICONS.chart, title: 'Margin Intelligence', body: 'Not just "what sold" — what actually made money. Live margin by item, category, and hour, because we capture cost on every unit.' },
-  { ico: ICONS.barcode, title: 'Scan-First Register', body: 'Works with the USB barcode scanner you already own — scan anytime, no clicking first. Built-in ID check prompts on beer, wine, and tobacco protect your license.' },
+  { ico: ICONS.barcode, title: 'Scan-First Register', body: 'Works with the USB barcode scanner you already own — scan anytime, no clicking first. Built-in ID check prompts on age-restricted items keep you compliant.' },
   { ico: ICONS.box, title: 'Smart Inventory', body: 'Auto-decrement on every sale, reorder-point alerts, and restock suggestions ranked by what earns you the most.' },
   { ico: ICONS.cash, title: 'Drawer & Shifts', body: 'Open and close the drawer, see exactly what should be in it, and know at a glance if you’re over or short at end of day.' },
   { ico: ICONS.shield, title: 'Staff & Audit', body: 'PIN logins for you and your cashiers, with a full trail of every sale, refund, discount, and drawer event.' },
@@ -73,14 +73,14 @@ export default function Landing() {
         <div className="hero-glow" />
         <div className="container hero-grid">
           <div>
-            <span className="pill">Built for convenience & liquor stores</span>
+            <span className="pill">Margin-first point of sale</span>
             <h1>
               The register that tells you <span className="gradient-text">what’s actually making you money.</span>
             </h1>
             <p className="lede">
-              TransactIQ is a point-of-sale for convenience and liquor stores.
-              It works with the barcode scanner you already own — and it captures
-              your cost on every item, so it shows real profit, not just sales.
+              TransactIQ is a point-of-sale for independent retailers. It works
+              with the barcode scanner you already own — and it captures your
+              cost on every item, so it shows real profit, not just sales.
             </p>
             <div className="hero-cta">
               <Link to="/demo" className="btn btn-primary">Try the live demo →</Link>

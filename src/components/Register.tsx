@@ -320,7 +320,7 @@ export default function Register() {
   )
 }
 
-// Big, unmissable ID prompt — the thing that keeps a liquor license safe.
+// Big, unmissable ID prompt for age-restricted items.
 function AgeCheck({
   product,
   onConfirm,

@@ -9,9 +9,9 @@ export default function Nav() {
           TransactIQ
         </Link>
         <div className="nav-links">
-          <a href="/#features">Features</a>
-          <a href="/#how">How it works</a>
-          <a href="/#pricing">Pricing</a>
+          <a href="#features">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
           <Link to="/demo" className="btn btn-primary" style={{ padding: '9px 18px' }}>
             Live demo →
           </Link>

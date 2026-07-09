@@ -23,7 +23,7 @@ function mulberry32(seed: number) {
 const rand = mulberry32(20240708)
 const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)]
 
-// ---- catalog: a typical mom-and-pop convenience + liquor store --------------
+// ---- catalog: realistic small-retail sample data ----------------------------
 // Margins tell the real story: cigarettes are the top seller but the WORST
 // earner (~14%); coffee, candy, and accessories quietly carry the store.
 export const CATALOG: Product[] = [
@@ -47,7 +47,7 @@ export const CATALOG: Product[] = [
   { id: 'p18', name: 'Phone Charger', emoji: '🔌', barcode: '099999000662', category: 'Other', price: 12.99, cost: 3.5, stock: 10, reorderPoint: 5, packSize: 10 },
 ]
 
-// popularity weights: smokes + beer + soda dominate a c-store's ticket count
+// popularity weights: smokes + beer + soda dominate the ticket count
 const WEIGHT: Record<string, number> = {
   p01: 10, p02: 6, p03: 7, p04: 6, p05: 8, p06: 3, p07: 4, p08: 3, p09: 9,
   p10: 6, p11: 5, p12: 7, p13: 5, p14: 8, p15: 3, p16: 4, p17: 4, p18: 1,
@@ -133,7 +133,7 @@ export const INVOICES: InvoiceDoc[] = [
     ],
   },
   {
-    vendor: 'Core-Mark C-Store Supply',
+    vendor: 'Core-Mark Distribution',
     invoiceNo: 'CM-30988',
     date: '2026-07-08',
     lines: [

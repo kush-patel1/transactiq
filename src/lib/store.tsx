@@ -55,6 +55,9 @@ export type Action =
       invoiceNo: string
       lines: ScannedLine[]
     }
+  | { type: 'ADD_PRODUCT'; product: Omit<Product, 'id'> }
+  | { type: 'UPDATE_PRODUCT'; productId: string; patch: Partial<Omit<Product, 'id' | 'stock'>> }
+  | { type: 'ADJUST_STOCK'; productId: string; delta: number; reason: string }
   | { type: 'OPEN_SHIFT'; startingCash: number }
   | { type: 'CASH_MOVEMENT'; label: string; amount: number }
   | { type: 'CLOSE_SHIFT'; countedCash: number }
@@ -250,6 +253,59 @@ function reducer(state: AppState, action: Action): AppState {
         audit: [
           ...state.audit,
           audit(state, 'RECEIVE', `${action.vendor} ${action.invoiceNo} · ${units} units across ${action.lines.length} lines`),
+        ],
+      }
+    }
+
+    case 'ADD_PRODUCT': {
+      if (!state.currentUserId) return state
+      const product: Product = {
+        ...action.product,
+        id: `p-${Date.now().toString(36)}`,
+      }
+      return {
+        ...state,
+        products: [...state.products, product],
+        audit: [
+          ...state.audit,
+          audit(state, 'PRODUCT_ADD', `added ${product.name} · $${product.price.toFixed(2)} / cost $${product.cost.toFixed(2)} · ${product.stock} in stock`),
+        ],
+      }
+    }
+
+    case 'UPDATE_PRODUCT': {
+      if (!state.currentUserId) return state
+      const before = state.products.find((p) => p.id === action.productId)
+      if (!before) return state
+      return {
+        ...state,
+        products: state.products.map((p) =>
+          p.id === action.productId ? { ...p, ...action.patch } : p,
+        ),
+        audit: [
+          ...state.audit,
+          audit(state, 'PRODUCT_EDIT', `edited ${before.name}`),
+        ],
+      }
+    }
+
+    case 'ADJUST_STOCK': {
+      if (!state.currentUserId || !action.delta) return state
+      const before = state.products.find((p) => p.id === action.productId)
+      if (!before) return state
+      const newStock = Math.max(0, before.stock + action.delta)
+      return {
+        ...state,
+        products: state.products.map((p) =>
+          p.id === action.productId ? { ...p, stock: newStock } : p,
+        ),
+        audit: [
+          ...state.audit,
+          audit(
+            state,
+            'STOCK_ADJUST',
+            `${before.name}: ${action.delta > 0 ? '+' : ''}${action.delta} (${action.reason}) · stock ${before.stock} → ${newStock}`,
+          ),
         ],
       }
     }

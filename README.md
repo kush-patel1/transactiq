@@ -1,6 +1,6 @@
 # TransactIQ
 
-A point-of-sale for convenience & liquor stores with a **margin-aware
+A point-of-sale for independent retailers with a **margin-aware
 intelligence layer**. It captures your true cost at receiving (via AI invoice
 scanning) so it can show you real profit — not just sales.
 
@@ -32,6 +32,8 @@ npm run dev
     cash checkout, receipt, live stock decrement
   - **AI Receiving** — scan/upload a supplier invoice → review matches →
     stock + cost lots update; vendors *learn* confirmed matches (rescan to see)
+  - **Inventory** (owner) — product catalog CRUD, audited stock adjustments
+    with reason codes, inventory value at cost/retail, low-stock filter
   - **IQ Dashboard** (owner) — margin KPIs, top earners, reorder intelligence
     ranked by profit-at-risk, busy-hours heatmap
   - **Back Office** (owner) — refunds with reason codes, cash drawer & shift

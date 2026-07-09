@@ -146,5 +146,8 @@ export interface AuditEntry {
     | 'SHIFT_OPEN'
     | 'SHIFT_CLOSE'
     | 'CASH_MOVE'
+    | 'PRODUCT_ADD'
+    | 'PRODUCT_EDIT'
+    | 'STOCK_ADJUST'
   detail: string
 }
