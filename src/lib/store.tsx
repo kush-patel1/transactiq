@@ -28,7 +28,7 @@ import { round2, shiftExpected } from './analytics'
 // components never touch storage directly, only dispatch.
 
 const STORAGE_KEY = 'transactiq-state'
-const STATE_VERSION = 3 // v3: convenience/liquor catalog + age-restricted items
+const STATE_VERSION = 4 // v4: break-pack products sharing one barcode
 
 export interface AppState {
   __v: number

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CartLine, Product, Sale } from '../lib/types'
 import { TAX_RATE, STORE_NAME } from '../lib/seed'
 import { money, round2 } from '../lib/analytics'
 import { useStore } from '../lib/store'
+import { useBarcodeScan } from '../lib/useBarcodeScan'
+import BarcodeChooser from './BarcodeChooser'
 
 const DISCOUNTS = [0, 5, 10, 15]
 
@@ -34,11 +36,8 @@ export default function Register() {
   const [startCash, setStartCash] = useState('150')
   const [idChecked, setIdChecked] = useState(false)
   const [agePrompt, setAgePrompt] = useState<Product | null>(null)
+  const [chooser, setChooser] = useState<Product[] | null>(null)
   const [flash, setFlash] = useState<ScanFlash>(null)
-
-  // Keep latest products/cart in refs so the global scan listener never goes stale.
-  const productsRef = useRef(products)
-  productsRef.current = products
 
   function showFlash(kind: 'ok' | 'fail', text: string) {
     setFlash({ kind, text, at: Date.now() })
@@ -70,12 +69,7 @@ export default function Register() {
     }
   }
 
-  function scanBarcode(code: string) {
-    const p = productsRef.current.find((x) => x.barcode === code)
-    if (!p) {
-      showFlash('fail', `Barcode ${code} not found`)
-      return
-    }
+  function pickScanned(p: Product) {
     if (p.stock === 0) {
       showFlash('fail', `${p.name} is out of stock`)
       return
@@ -83,32 +77,22 @@ export default function Register() {
     add(p, true)
   }
 
-  // Scan-anywhere: a USB barcode scanner is just a very fast keyboard.
-  // Buffer rapid digit keystrokes ending in Enter — no need to click anything
-  // first. (When focus is in an input, the search box's own handler takes over.)
-  const scanRef = useRef({ buf: '', last: 0 })
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement
-      const tag = target?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      const s = scanRef.current
-      const now = Date.now()
-      if (now - s.last > 250) s.buf = '' // human-speed gap → not a scanner
-      s.last = now
-      if (e.key === 'Enter') {
-        if (s.buf.length >= 6) scanBarcode(s.buf)
-        s.buf = ''
-      } else if (/^\d$/.test(e.key)) {
-        s.buf += e.key
-      } else {
-        s.buf = ''
-      }
+  function scanBarcode(code: string) {
+    if (!openShift) return // drawer closed — register can't ring
+    const matches = products.filter((x) => x.barcode === code)
+    if (matches.length === 0) {
+      showFlash('fail', `Barcode ${code} not in inventory — add it on the Inventory tab`)
+      return
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idChecked]) // rebind so add() sees current idChecked
+    if (matches.length === 1) {
+      pickScanned(matches[0])
+      return
+    }
+    // shared barcode (break-packs): ask which product this is
+    setChooser(matches)
+  }
+
+  useBarcodeScan(scanBarcode)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -165,11 +149,12 @@ export default function Register() {
   // Enter in the search box: exact barcode → add (scanner with cursor in box).
   function onSearchKey(e: React.KeyboardEvent) {
     if (e.key !== 'Enter') return
-    const hit = products.find((p) => p.barcode === query.trim())
-    if (hit && hit.stock > 0) {
-      add(hit, true)
-      setQuery('')
-    }
+    const code = query.trim()
+    const matches = products.filter((p) => p.barcode === code)
+    if (!matches.length) return
+    setQuery('')
+    if (matches.length === 1) pickScanned(matches[0])
+    else setChooser(matches)
   }
 
   const detailed = cart.map((l) => {
@@ -285,6 +270,18 @@ export default function Register() {
           Charge {money(total)} · Cash
         </button>
       </aside>
+
+      {chooser && (
+        <BarcodeChooser
+          products={chooser}
+          subtitle="This barcode is used by more than one product (break-packs). Which one is the customer buying?"
+          onPick={(p) => {
+            setChooser(null)
+            pickScanned(p)
+          }}
+          onCancel={() => setChooser(null)}
+        />
+      )}
 
       {agePrompt && (
         <AgeCheck

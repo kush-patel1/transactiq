@@ -29,7 +29,7 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)]
 export const CATALOG: Product[] = [
   { id: 'p01', name: 'Marlboro Red (pack)', emoji: '🚬', barcode: '028200003843', category: 'Tobacco', price: 9.49, cost: 8.15, stock: 80, reorderPoint: 40, packSize: 10, minAge: 21 },
   { id: 'p02', name: 'Newport Menthol (pack)', emoji: '🚬', barcode: '026100008431', category: 'Tobacco', price: 9.99, cost: 8.6, stock: 55, reorderPoint: 30, packSize: 10, minAge: 21 },
-  { id: 'p03', name: 'Bud Light 12-pack', emoji: '🍺', barcode: '018200530616', category: 'Beer', price: 12.99, cost: 9.75, stock: 26, reorderPoint: 12, packSize: 2, minAge: 21 },
+  { id: 'p03', name: 'Bud Light 30-pack', emoji: '🍺', barcode: '018200530616', category: 'Beer', price: 22.99, cost: 17.4, stock: 20, reorderPoint: 8, packSize: 1, minAge: 21 },
   { id: 'p04', name: 'Modelo 6-pack', emoji: '🍻', barcode: '080660956435', category: 'Beer', price: 10.49, cost: 7.9, stock: 22, reorderPoint: 10, packSize: 4, minAge: 21 },
   { id: 'p05', name: 'Tall Boy Lager 24oz', emoji: '🍺', barcode: '034100004316', category: 'Beer', price: 2.99, cost: 1.95, stock: 48, reorderPoint: 24, packSize: 24, minAge: 21 },
   { id: 'p06', name: 'Cabernet 750ml', emoji: '🍷', barcode: '085000019306', category: 'Wine', price: 11.99, cost: 7.25, stock: 18, reorderPoint: 8, packSize: 12, minAge: 21 },
@@ -45,12 +45,18 @@ export const CATALOG: Product[] = [
   { id: 'p16', name: 'Ice Bag 7lb', emoji: '🧊', barcode: '099999000389', category: 'Grocery', price: 2.99, cost: 0.9, stock: 30, reorderPoint: 15, packSize: 1 },
   { id: 'p17', name: 'Whole Milk (gal)', emoji: '🥛', barcode: '011110491008', category: 'Grocery', price: 4.79, cost: 3.3, stock: 16, reorderPoint: 8, packSize: 4 },
   { id: 'p18', name: 'Phone Charger', emoji: '🔌', barcode: '099999000662', category: 'Other', price: 12.99, cost: 3.5, stock: 10, reorderPoint: 5, packSize: 10 },
+  // Break-packs: same UPC as the pack they're split from, different price.
+  // Scanning a shared barcode makes the register ask which product it is.
+  { id: 'p19', name: 'Bud Light 6-pack', emoji: '🍺', barcode: '018200530616', category: 'Beer', price: 6.99, cost: 3.48, stock: 15, reorderPoint: 6, packSize: 5, minAge: 21 },
+  { id: 'p20', name: 'Coke 12-pack', emoji: '🥤', barcode: '049000028911', category: 'Drinks', price: 7.99, cost: 4.8, stock: 18, reorderPoint: 8, packSize: 2 },
+  { id: 'p21', name: 'Coke Can (single)', emoji: '🥤', barcode: '049000028911', category: 'Drinks', price: 1.25, cost: 0.4, stock: 40, reorderPoint: 24, packSize: 12 },
 ]
 
 // popularity weights: smokes + beer + soda dominate the ticket count
 const WEIGHT: Record<string, number> = {
-  p01: 10, p02: 6, p03: 7, p04: 6, p05: 8, p06: 3, p07: 4, p08: 3, p09: 9,
+  p01: 10, p02: 6, p03: 4, p04: 6, p05: 8, p06: 3, p07: 4, p08: 3, p09: 9,
   p10: 6, p11: 5, p12: 7, p13: 5, p14: 8, p15: 3, p16: 4, p17: 4, p18: 1,
+  p19: 6, p20: 4, p21: 8,
 }
 const WEIGHTED_IDS: string[] = CATALOG.flatMap((p) =>
   Array<string>(WEIGHT[p.id] ?? 1).fill(p.id),
@@ -124,7 +130,7 @@ export const INVOICES: InvoiceDoc[] = [
     invoiceNo: 'CB-77120',
     date: '2026-07-07',
     lines: [
-      { raw: 'BUD LT 12PK CANS CS/2', matchedProductId: 'p03', caseQty: 3, packSize: 2, qtyReceived: 6, unitCost: 9.6, confidence: 0.96 },
+      { raw: 'BUD LT 30PK CANS EA', matchedProductId: 'p03', caseQty: 4, packSize: 1, qtyReceived: 4, unitCost: 17.25, confidence: 0.96 },
       { raw: 'MODELO ESP 6PK BTL 4/CS', matchedProductId: 'p04', caseQty: 2, packSize: 4, qtyReceived: 8, unitCost: 7.8, confidence: 0.93 },
       { raw: 'TALLBOY LAGER 24OZ 24CS', matchedProductId: 'p05', caseQty: 1, packSize: 24, qtyReceived: 24, unitCost: 1.9, confidence: 0.88 },
       { raw: 'CAB SAUV 750 12/CS', matchedProductId: 'p06', caseQty: 1, packSize: 12, qtyReceived: 12, unitCost: 7.1, confidence: 0.85 },
@@ -140,6 +146,7 @@ export const INVOICES: InvoiceDoc[] = [
       { raw: 'MARL RED KING BX 10CT', matchedProductId: 'p01', caseQty: 2, packSize: 10, qtyReceived: 20, unitCost: 8.05, confidence: 0.97 },
       { raw: 'NWPRT MENTH BX 10CT', matchedProductId: 'p02', caseQty: 1, packSize: 10, qtyReceived: 10, unitCost: 8.5, confidence: 0.95 },
       { raw: 'COKE 20Z PET 24CS', matchedProductId: 'p09', caseQty: 2, packSize: 24, qtyReceived: 48, unitCost: 1.05, confidence: 0.92 },
+      { raw: 'COKE 12PK FRIDGE 2/CS', matchedProductId: 'p20', caseQty: 2, packSize: 2, qtyReceived: 4, unitCost: 4.7, confidence: 0.87 },
       { raw: 'ENRGY DRNK 16OZ 24', matchedProductId: 'p10', caseQty: 1, packSize: 24, qtyReceived: 24, unitCost: 1.8, confidence: 0.9 },
       { raw: 'CANDY CHOC KING 36CT', matchedProductId: 'p14', caseQty: 1, packSize: 36, qtyReceived: 36, unitCost: 0.7, confidence: 0.89 },
       { raw: 'JERKY ORIG 3.25OZ 12', matchedProductId: 'p15', caseQty: 1, packSize: 12, qtyReceived: 12, unitCost: 4.0, confidence: 0.82 },

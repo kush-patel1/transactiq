@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { Category, Product } from '../lib/types'
 import { money, round2 } from '../lib/analytics'
 import { useStore } from '../lib/store'
+import { useBarcodeScan } from '../lib/useBarcodeScan'
+import BarcodeChooser from './BarcodeChooser'
 
 const CATEGORIES: Category[] = [
   'Tobacco', 'Beer', 'Wine', 'Spirits', 'Drinks', 'Snacks', 'Grocery', 'Other',
@@ -38,11 +40,24 @@ export default function Inventory() {
   const [cat, setCat] = useState<'All' | Category>('All')
   const [lowOnly, setLowOnly] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [chooser, setChooser] = useState<Product[] | null>(null)
   const [adjustingId, setAdjustingId] = useState<string | null>(null)
   const [delta, setDelta] = useState('')
   const [reason, setReason] = useState(ADJUST_REASONS[0])
 
   const products = state.products
+
+  // Scan a barcode anywhere on this tab:
+  //   known (one match)  → opens that product's edit form
+  //   known (shared UPC) → chooser, then edit the picked one
+  //   unknown            → Add Product form, barcode prefilled
+  function openForBarcode(code: string) {
+    const matches = products.filter((p) => p.barcode === code)
+    if (matches.length === 0) setDraft({ ...emptyDraft(), barcode: code })
+    else if (matches.length === 1) setDraft(draftFrom(matches[0]))
+    else setChooser(matches)
+  }
+  useBarcodeScan(openForBarcode)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -84,7 +99,8 @@ export default function Inventory() {
           <div>
             <h3>Products</h3>
             <div className="p-sub" style={{ marginBottom: 0 }}>
-              Prices, costs, and stock. Stock changes go through adjustments so everything is audited.
+              Scan any barcode to edit that product — unknown barcodes open the
+              add form. Stock changes go through adjustments so everything is audited.
             </div>
           </div>
           <button className="btn btn-primary" onClick={() => setDraft(emptyDraft())}>
@@ -95,10 +111,19 @@ export default function Inventory() {
         <div className="mini-form" style={{ marginTop: 14 }}>
           <input
             className="mini-input"
-            style={{ width: 220 }}
-            placeholder="Search name or barcode…"
+            style={{ width: 240 }}
+            placeholder="Scan a barcode, or search…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // scanner with cursor in the box: exact barcode + Enter → edit/add
+              if (e.key !== 'Enter') return
+              const code = query.trim()
+              if (/^\d{6,}$/.test(code)) {
+                setQuery('')
+                openForBarcode(code)
+              }
+            }}
             aria-label="Search products"
           />
           <select
@@ -192,9 +217,24 @@ export default function Inventory() {
         </table>
       </div>
 
+      {chooser && (
+        <BarcodeChooser
+          products={chooser}
+          subtitle="This barcode is shared by several products (break-packs). Which one do you want to edit?"
+          onPick={(p) => {
+            setChooser(null)
+            setDraft(draftFrom(p))
+          }}
+          onCancel={() => setChooser(null)}
+        />
+      )}
+
       {draft && (
         <ProductModal
           draft={draft}
+          sharedWith={products.filter(
+            (p) => draft.barcode.trim() && p.barcode === draft.barcode.trim() && p.id !== draft.id,
+          )}
           onChange={setDraft}
           onCancel={() => setDraft(null)}
           onSave={() => {
@@ -239,11 +279,13 @@ function Kpi({ label, value, sub, warn }: { label: string; value: string; sub: s
 
 function ProductModal({
   draft,
+  sharedWith,
   onChange,
   onSave,
   onCancel,
 }: {
   draft: Draft
+  sharedWith: Product[]
   onChange: (d: Draft) => void
   onSave: () => void
   onCancel: () => void
@@ -269,6 +311,13 @@ function ProductModal({
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          {sharedWith.length > 0 && (
+            <div className="share-note">
+              This barcode is also on <strong>{sharedWith.map((p) => p.name).join(', ')}</strong>.
+              That’s fine — it’s how break-packs work (a 6-pack split from a 30-pack keeps
+              the same UPC). Scanning it will ask which product is being sold.
+            </div>
+          )}
           <div className="field">
             <label htmlFor="f-price">Price $</label>
             <input id="f-price" type="number" step="0.01" value={draft.price} onChange={(e) => set({ price: e.target.value })} />
