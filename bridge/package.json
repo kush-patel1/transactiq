@@ -1,0 +1,15 @@
+{
+  "name": "transactiq-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local hardware bridge for TransactIQ — receipt printer + cash drawer. Runs on the register PC; the browser app calls it on 127.0.0.1.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-thermal-printer": "^4.6.0"
+  }
+}

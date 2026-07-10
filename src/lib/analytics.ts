@@ -166,32 +166,39 @@ export function reorderSuggestions(
 }
 
 // ---- drawer / shift math ------------------------------------------------------
-// Expected cash = starting float + cash sales rung during the shift
-// (refunded shift sales net to zero: cash came in, then went back out)
-// + signed paid-in/paid-out movements.
+// Expected cash = starting float + CASH sales rung during the shift
+// (card sales never enter the physical drawer; refunded shift sales net to
+// zero: cash came in, then went back out) + signed paid-in/out movements.
 export function shiftExpected(shift: Shift, sales: Sale[]): number {
   const cashSales = sales
-    .filter((s) => s.shiftId === shift.id && s.status === 'completed')
+    .filter((s) => s.shiftId === shift.id && s.status === 'completed' && s.tender === 'cash')
     .reduce((t, s) => t + s.total, 0)
   const moves = shift.movements.reduce((t, m) => t + m.amount, 0)
   return round2(shift.startingCash + cashSales + moves)
 }
 
 export interface ShiftReport {
-  transactions: number
-  gross: number
+  transactions: number // all tenders — revenue view
+  cashTransactions: number // drawer view
+  gross: number // all tenders
+  cashGross: number // cash only — cross-checks the drawer
+  cardGross: number
   discounts: number
   tax: number
   refunds: number
-  expected: number
+  expected: number // physical drawer cash (cash-only math)
 }
 
 export function shiftReport(shift: Shift, sales: Sale[]): ShiftReport {
   const inShift = sales.filter((s) => s.shiftId === shift.id)
   const done = inShift.filter((s) => s.status === 'completed')
+  const cash = done.filter((s) => s.tender === 'cash')
   return {
     transactions: done.length,
+    cashTransactions: cash.length,
     gross: round2(done.reduce((t, s) => t + s.total, 0)),
+    cashGross: round2(cash.reduce((t, s) => t + s.total, 0)),
+    cardGross: round2(done.filter((s) => s.tender === 'card').reduce((t, s) => t + s.total, 0)),
     discounts: round2(done.reduce((t, s) => t + s.discount, 0)),
     tax: round2(done.reduce((t, s) => t + s.tax, 0)),
     refunds: inShift.filter((s) => s.status === 'refunded').length,
@@ -204,17 +211,19 @@ export function salesToCsv(sales: Sale[], users: User[]): string {
   const nameOf = new Map(users.map((u) => [u.id, u.name]))
   const esc = (v: string) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v)
   const rows = [
-    'id,datetime,cashier,status,subtotal,discount,tax,total,items',
+    'id,datetime,cashier,status,tender,subtotal,discount,tax,total,amount_tendered,items',
     ...sales.map((s) =>
       [
         s.id,
         new Date(s.timestamp).toISOString(),
         nameOf.get(s.cashierId) ?? s.cashierId,
         s.status,
+        s.tender,
         s.subtotal.toFixed(2),
         s.discount.toFixed(2),
         s.tax.toFixed(2),
         s.total.toFixed(2),
+        s.tender === 'cash' && s.amountTendered != null ? s.amountTendered.toFixed(2) : '',
         esc(s.lines.map((l) => `${l.qty}x ${l.name}`).join('; ')),
       ].join(','),
     ),

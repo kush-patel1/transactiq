@@ -1277,8 +1277,113 @@ footer.foot {
 }
 .drawer-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+}
+
+/* customer pole display — VFD look on purpose: this mirrors real hardware */
+.pole-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.pole-preview {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pole-screen {
+  background: #0a0e14;
+  border: 1px solid #1f2733;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.pole-line {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  color: #7fe7ff;
+  text-shadow: 0 0 6px rgba(127, 231, 255, 0.55);
+  white-space: pre;
+}
+.pole-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.pole-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.pole-dot.live {
+  background: var(--green);
+}
+.pole-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pole-controls .btn {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+/* tender selection + cash change math */
+.tender-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tender-toggle .btn {
+  padding: 11px 0;
+  font-size: 15px;
+}
+.cash-panel {
+  margin-top: 10px;
+}
+.quick-amts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.quick-amt {
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-weight: 650;
+  font-size: 13.5px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.quick-amt:hover {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+.change-due {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--green-soft);
+  border: 1px solid var(--green-border);
+  color: var(--green);
+  font-weight: 750;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .variance-bad {
   font-weight: 700;

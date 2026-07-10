@@ -105,7 +105,10 @@ function DrawerPanel() {
                     <td>{s.id} · {userName(s.openedByUserId)}</td>
                     <td>{fmtTime(s.openedAt)}</td>
                     <td>{s.closedAt ? fmtTime(s.closedAt) : '—'}</td>
-                    <td>{rep.transactions}{rep.refunds ? ` (−${rep.refunds} ref)` : ''}</td>
+                    <td>
+                      {rep.transactions} ({rep.cashTransactions} cash)
+                      {rep.refunds ? ` −${rep.refunds} ref` : ''}
+                    </td>
                     <td>{money(s.expectedCash ?? 0)}</td>
                     <td>{money(s.countedCash ?? 0)}</td>
                     <td className={variance === 0 ? 'marg-pct' : 'variance-bad'}>
@@ -158,8 +161,12 @@ function OpenShiftView({
           <div className="value">{money(openShift.startingCash)}</div>
         </div>
         <div className="kpi">
-          <div className="label">Cash sales ({rep.transactions})</div>
-          <div className="value">{money(rep.gross)}</div>
+          <div className="label">Cash sales ({rep.cashTransactions})</div>
+          <div className="value">{money(rep.cashGross)}</div>
+        </div>
+        <div className="kpi">
+          <div className="label">Card sales ({rep.transactions - rep.cashTransactions})</div>
+          <div className="value">{money(rep.cardGross)}</div>
         </div>
         <div className="kpi">
           <div className="label">Paid in/out</div>
@@ -244,7 +251,7 @@ function SalesHistory() {
       <div className="p-sub">Latest 20 of {state.sales.length.toLocaleString()} sales. Refunds restock items and hit the audit trail.</div>
       <table className="marg-table">
         <thead>
-          <tr><th>Time</th><th>Cashier</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
+          <tr><th>Time</th><th>Cashier</th><th>Items</th><th>Total</th><th>Tender</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
           {recent.map((s) => (
@@ -253,6 +260,7 @@ function SalesHistory() {
               <td>{userName(s.cashierId)}</td>
               <td>{s.lines.reduce((n, l) => n + l.qty, 0)}</td>
               <td>{money(s.total)}{s.discount > 0 ? ` (−${s.discountPct}%)` : ''}</td>
+              <td>{s.tender === 'cash' ? 'Cash' : 'Card'}</td>
               <td>
                 {s.status === 'refunded' ? (
                   <span className="badge-amber" title={s.refund?.reason}>refunded</span>
@@ -360,7 +368,8 @@ function ExportPanel() {
         Download sales CSV ({state.sales.length.toLocaleString()} rows)
       </button>
       <p style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 14 }}>
-        Includes id, datetime, cashier, status, subtotal, discount, tax, total, and line items.
+        Includes id, datetime, cashier, status, tender, subtotal, discount, tax,
+        total, amount tendered, and line items.
       </p>
     </div>
   )

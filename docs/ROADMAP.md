@@ -70,14 +70,34 @@ IQ dashboard           →  margin = price − cost, by item / category / hour
   Z reports with expected vs. counted variance
 - Sales CSV export (QuickBooks/Xero sync later)
 
+### Hardware integration ✅ (software side; physical bring-up pending)
+Store runs: USB scanner ✅ · SAM4S pole display · standalone Ingenico terminal
+(no integration by design — zero PCI scope) · drawer kicked via receipt printer.
+- **Tender split** ✅ — cash/card toggle at the register; cash gets
+  received-amount quick-buttons + change due; card charges the total (cashier
+  keys it into the terminal). `shiftExpected()` counts ONLY cash toward the
+  physical drawer; X/Z reports show both tenders; CSV + audit carry tender.
+- **Customer pole display** ✅ — WebSerial (Chrome/Edge), `cd5220`/`epson`
+  protocol toggle (must match the unit's DIP switch — exact bytes need a
+  bring-up session with the physical unit), auto-reconnect, debounced writes,
+  glitches never block a sale. On-screen preview renders the same 2×20 lines
+  as the hardware — doubles as the customer display for stores without one.
+- **Print bridge** ✅ (`bridge/` — own Node project) — Express on
+  `127.0.0.1:9420` only, origin-allowlisted CORS, `/health` `/print-receipt`
+  `/open-drawer`, simulation mode without hardware (`PRINTER_INTERFACE` env
+  goes live). Receipts print for both tenders; drawer kicks cash-only;
+  failures are non-blocking warnings. Packaging target: Electron tray app.
+
 ### Next up (to leave demo-land)
-1. **Firestore + Auth wiring** — needs the Firebase web config for `.env`;
+1. **Hardware bring-up** — confirm SAM4S DIP mode + bytes (9600 8N1), pick the
+   thermal printer, pilot one register end-to-end
+2. **Firestore + Auth wiring** — needs the Firebase web config for `.env`;
    swap the localStorage persistence for Firestore behind the same actions
-2. **Real Claude vision extraction** in `extractInvoice()` (Receiving.tsx)
-3. Firestore security rules + offline persistence flag
+3. **Real Claude vision extraction** in `extractInvoice()` (Receiving.tsx)
 
 ### Later (not MVP)
-- Card payments (Stripe Terminal), split tender
+- Integrated card terminal (semi-integration via processor/Datacap) — only if
+  the store ever wants totals pushed to the terminal automatically
 - Multi-location, cross-store inventory
 - Loyalty / gift cards / store credit
 - Promotions engine

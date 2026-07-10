@@ -99,6 +99,16 @@ function buildSales(): Sale[] {
         const restricted = lines.some(
           (l) => CATALOG.find((p) => p.id === l.productId)?.minAge,
         )
+        const total = Math.round((subtotal + tax) * 100) / 100
+        // realistic tender mix (~60% card); cash customers usually hand over
+        // the next bill up, sometimes exact. Deterministic via the seeded PRNG.
+        const tender = rand() < 0.4 ? ('cash' as const) : ('card' as const)
+        const amountTendered =
+          tender === 'cash'
+            ? rand() < 0.3
+              ? total
+              : Math.ceil(total / 5) * 5
+            : undefined
         sales.push({
           id: `s${(counter++).toString().padStart(5, '0')}`,
           timestamp: ts,
@@ -107,8 +117,9 @@ function buildSales(): Sale[] {
           discountPct: 0,
           discount: 0,
           tax,
-          total: Math.round((subtotal + tax) * 100) / 100,
-          tender: 'cash',
+          total,
+          tender,
+          amountTendered,
           cashierId: counter % 2 === 0 ? 'u1' : 'u2',
           shiftId: null, // seed history predates drawer tracking
           status: 'completed',

@@ -16,6 +16,7 @@ import type {
   SaleLine,
   ScannedLine,
   Shift,
+  Tender,
   User,
   Vendor,
 } from './types'
@@ -28,7 +29,7 @@ import { round2, shiftExpected } from './analytics'
 // components never touch storage directly, only dispatch.
 
 const STORAGE_KEY = 'transactiq-state'
-const STATE_VERSION = 4 // v4: break-pack products sharing one barcode
+const STATE_VERSION = 5 // v5: cash/card tender split + amountTendered
 
 export interface AppState {
   __v: number
@@ -47,7 +48,14 @@ export interface AppState {
 export type Action =
   | { type: 'LOGIN'; userId: string }
   | { type: 'LOGOUT' }
-  | { type: 'COMMIT_SALE'; cart: CartLine[]; discountPct: number; idChecked?: boolean }
+  | {
+      type: 'COMMIT_SALE'
+      cart: CartLine[]
+      discountPct: number
+      idChecked?: boolean
+      tender: Tender
+      amountTendered?: number
+    }
   | { type: 'REFUND_SALE'; saleId: string; reason: string }
   | {
       type: 'CONFIRM_RECEIVING'
@@ -140,14 +148,19 @@ function reducer(state: AppState, action: Action): AppState {
         discount,
         tax,
         total: round2(subtotal - discount + tax),
-        tender: 'cash',
+        tender: action.tender,
+        amountTendered:
+          action.tender === 'cash' && action.amountTendered != null
+            ? round2(action.amountTendered)
+            : undefined,
         cashierId: state.currentUserId,
         shiftId: shift?.id ?? null,
         status: 'completed',
         idChecked: action.idChecked || undefined,
       }
       const detail =
-        `sale ${sale.id} · ${lines.reduce((n, l) => n + l.qty, 0)} items · $${sale.total.toFixed(2)}` +
+        `sale ${sale.id} · ${lines.reduce((n, l) => n + l.qty, 0)} items · $${sale.total.toFixed(2)} · ${action.tender}` +
+        (sale.amountTendered != null ? ` · tendered $${sale.amountTendered.toFixed(2)}` : '') +
         (discount > 0 ? ` · ${action.discountPct}% discount (−$${discount.toFixed(2)})` : '') +
         (action.idChecked ? ' · ID checked' : '')
       return {

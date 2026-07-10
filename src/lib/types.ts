@@ -51,6 +51,10 @@ export interface SaleLine {
 
 export type SaleStatus = 'completed' | 'refunded'
 
+// Card runs on the store's standalone terminal (cashier keys the total in);
+// TransactIQ only records which tender was used — no card data ever touches us.
+export type Tender = 'cash' | 'card'
+
 export interface Sale {
   id: string
   timestamp: number // epoch ms
@@ -60,7 +64,8 @@ export interface Sale {
   discount: number // dollar amount taken off subtotal
   tax: number
   total: number
-  tender: 'cash'
+  tender: Tender
+  amountTendered?: number // cash only — what the customer handed over
   cashierId: string
   shiftId: string | null // null for pre-drawer (seed) sales
   status: SaleStatus

@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CartLine, Product, Sale } from '../lib/types'
+import type { CartLine, Product, Sale, Tender } from '../lib/types'
 import { TAX_RATE, STORE_NAME } from '../lib/seed'
 import { money, round2 } from '../lib/analytics'
 import { useStore } from '../lib/store'
 import { useBarcodeScan } from '../lib/useBarcodeScan'
+import { usePoleDisplay } from '../lib/poleDisplay/usePoleDisplay'
+import { fmt20, PROTOCOL_LABELS, type PoleProtocol } from '../lib/poleDisplay/protocols'
+import { usePrintBridge, type ReceiptPayload } from '../lib/printBridge/usePrintBridge'
 import BarcodeChooser from './BarcodeChooser'
+import PoleDisplayPreview from './PoleDisplayPreview'
 
 const DISCOUNTS = [0, 5, 10, 15]
 
@@ -26,6 +30,14 @@ function ageCutoffDate(): string {
 
 type ScanFlash = { kind: 'ok' | 'fail'; text: string; at: number } | null
 
+// Cash quick-fill buttons: exact amount plus the bills a customer would
+// realistically hand over ($10 for a $9.62 total, then $20, $50, $100).
+function quickAmounts(total: number): number[] {
+  if (total <= 0) return []
+  const bills = [5, 10, 20, 50, 100].filter((b) => b > total).slice(0, 3)
+  return [total, ...bills]
+}
+
 export default function Register() {
   const { state, dispatch, currentUser, openShift } = useStore()
   const products = state.products
@@ -38,6 +50,11 @@ export default function Register() {
   const [agePrompt, setAgePrompt] = useState<Product | null>(null)
   const [chooser, setChooser] = useState<Product[] | null>(null)
   const [flash, setFlash] = useState<ScanFlash>(null)
+  const [tender, setTender] = useState<Tender>('cash')
+  const [tendered, setTendered] = useState('') // cash only — amount handed over
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
+  const pole = usePoleDisplay()
+  const bridge = usePrintBridge()
 
   function showFlash(kind: 'ok' | 'fail', text: string) {
     setFlash({ kind, text, at: Date.now() })
@@ -63,6 +80,7 @@ export default function Register() {
       if (line) return prev.map((l) => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l))
       return [...prev, { productId: p.id, qty: 1 }]
     })
+    if (added) setLastAddedId(p.id)
     if (viaScan) {
       if (added || p.stock > 0) showFlash('ok', `${p.name} — ${money(p.price)}`)
       else showFlash('fail', `${p.name} is out of stock`)
@@ -101,6 +119,50 @@ export default function Register() {
       (p) => p.name.toLowerCase().includes(q) || p.barcode.includes(q),
     )
   }, [products, query])
+
+  const detailed = cart.map((l) => {
+    const p = products.find((x) => x.id === l.productId)!
+    return { ...l, product: p, lineTotal: p.price * l.qty }
+  })
+  const subtotal = round2(detailed.reduce((s, l) => s + l.lineTotal, 0))
+  const discount = round2((subtotal * discountPct) / 100)
+  const tax = round2((subtotal - discount) * TAX_RATE)
+  const total = round2(subtotal - discount + tax)
+  const hasRestricted = detailed.some((l) => l.product.minAge)
+
+  const tenderedNum = round2(Number(tendered) || 0)
+  const changeDue = round2(Math.max(0, tenderedNum - total))
+  // cash can't complete for less than the total; card charges the total directly
+  const chargeBlocked = !cart.length || (tender === 'cash' && tenderedNum < total)
+
+  // Customer display lines — computed once, fed to BOTH the hardware and the
+  // on-screen preview so they can never disagree.
+  const lastLine = detailed.find((l) => l.productId === lastAddedId)
+  let poleL1: string
+  let poleL2: string
+  if (!openShift) {
+    poleL1 = STORE_NAME
+    poleL2 = 'Register closed'
+  } else if (awaitingReceipt && state.lastSale) {
+    const s = state.lastSale
+    poleL1 =
+      s.tender === 'cash' && s.amountTendered != null
+        ? fmt20('CHANGE', money(round2(s.amountTendered - s.total)))
+        : fmt20('TOTAL', money(s.total))
+    poleL2 = 'Thank you!'
+  } else if (!detailed.length) {
+    poleL1 = STORE_NAME
+    poleL2 = 'Welcome!'
+  } else {
+    poleL1 = lastLine
+      ? fmt20(`${lastLine.qty} ${lastLine.product.name}`, money(lastLine.product.price))
+      : fmt20(`${detailed.length} items`)
+    poleL2 = fmt20('TOTAL', money(total))
+  }
+  useEffect(() => {
+    pole.showLines(poleL1, poleL2)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poleL1, poleL2, pole.connected])
 
   // A real drawer can't ring sales until a shift is open.
   if (!openShift) {
@@ -157,24 +219,51 @@ export default function Register() {
     else setChooser(matches)
   }
 
-  const detailed = cart.map((l) => {
-    const p = products.find((x) => x.id === l.productId)!
-    return { ...l, product: p, lineTotal: p.price * l.qty }
-  })
-  const subtotal = round2(detailed.reduce((s, l) => s + l.lineTotal, 0))
-  const discount = round2((subtotal * discountPct) / 100)
-  const tax = round2((subtotal - discount) * TAX_RATE)
-  const total = round2(subtotal - discount + tax)
-  const hasRestricted = detailed.some((l) => l.product.minAge)
-
   function charge() {
-    if (!cart.length) return
-    dispatch({ type: 'COMMIT_SALE', cart, discountPct, idChecked: hasRestricted && idChecked })
+    if (chargeBlocked) return
+    dispatch({
+      type: 'COMMIT_SALE',
+      cart,
+      discountPct,
+      idChecked: hasRestricted && idChecked,
+      tender,
+      amountTendered: tender === 'cash' ? tenderedNum : undefined,
+    })
+    // Hardware side effects — best-effort, NEVER block the sale (it's already
+    // committed above). Receipt prints for both tenders; drawer kicks on cash
+    // only (no cash changes hands on a card sale).
+    if (bridge.available) {
+      const payload: ReceiptPayload = {
+        storeName: STORE_NAME,
+        timestamp: Date.now(),
+        cashier: currentUser?.name ?? '',
+        lines: detailed.map((l) => ({ qty: l.qty, name: l.product.name, lineTotal: round2(l.lineTotal) })),
+        subtotal,
+        discount,
+        discountPct,
+        tax,
+        total,
+        tender,
+        amountTendered: tender === 'cash' ? tenderedNum : undefined,
+        idChecked: hasRestricted && idChecked,
+      }
+      void bridge.printReceipt(payload).then((r) => {
+        if (!r.ok) showFlash('fail', 'Printer offline — sale saved, no paper receipt')
+      })
+      if (tender === 'cash') {
+        void bridge.openDrawer().then((r) => {
+          if (!r.ok) showFlash('fail', 'Drawer did not open — use the key')
+        })
+      }
+    }
     setAwaitingReceipt(true)
     setCart([])
     setDiscountPct(0)
     setQuery('')
     setIdChecked(false)
+    setTender('cash')
+    setTendered('')
+    setLastAddedId(null)
   }
 
   return (
@@ -188,6 +277,55 @@ export default function Register() {
         >
           {flash ? (flash.kind === 'ok' ? '✓ ' : '✗ ') + flash.text : 'Ready to scan'}
         </div>
+
+        {/* customer-facing display: real hardware when connected, faithful
+            on-screen preview always */}
+        <div className="pole-row">
+          <PoleDisplayPreview line1={poleL1} line2={poleL2} live={pole.connected} />
+          {pole.supported && (
+            <div className="pole-controls">
+              {pole.connected ? (
+                <button className="btn btn-ghost" onClick={() => void pole.disconnect()}>
+                  Disconnect display
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => void pole.connect()}
+                    disabled={pole.connecting}
+                  >
+                    {pole.connecting ? 'Connecting…' : 'Connect display'}
+                  </button>
+                  <select
+                    className="discount-select"
+                    value={pole.protocol}
+                    onChange={(e) => pole.setProtocol(e.target.value as PoleProtocol)}
+                    aria-label="Display protocol"
+                    title="Must match the DIP-switch mode on the display unit"
+                  >
+                    {(Object.keys(PROTOCOL_LABELS) as PoleProtocol[]).map((p) => (
+                      <option key={p} value={p}>{PROTOCOL_LABELS[p]}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {pole.lastError && (
+                <span style={{ color: 'var(--red)', fontSize: 12 }}>{pole.lastError}</span>
+              )}
+            </div>
+          )}
+          {bridge.available && (
+            <span
+              className="chip"
+              title={`Local print bridge is running (printer: ${bridge.printer})`}
+              style={{ paddingLeft: 12 }}
+            >
+              Printer · {bridge.printer === 'connected' ? 'ready' : bridge.printer}
+            </span>
+          )}
+        </div>
+
         <input
           className="search"
           placeholder="🔎 Scan any barcode, anytime — or search by name…"
@@ -266,8 +404,67 @@ export default function Register() {
           <div className="row"><span>Tax ({(TAX_RATE * 100).toFixed(0)}%)</span><span>{money(tax)}</span></div>
           <div className="row grand"><span>Total</span><span>{money(total)}</span></div>
         </div>
-        <button className="charge" onClick={charge} disabled={!cart.length}>
-          Charge {money(total)} · Cash
+
+        {/* tender: cash goes in the drawer, card runs on the standalone terminal */}
+        <div className="tender-toggle">
+          <button
+            className={'btn ' + (tender === 'cash' ? 'btn-primary' : 'btn-ghost')}
+            onClick={() => setTender('cash')}
+            aria-pressed={tender === 'cash'}
+          >
+            Cash
+          </button>
+          <button
+            className={'btn ' + (tender === 'card' ? 'btn-primary' : 'btn-ghost')}
+            onClick={() => { setTender('card'); setTendered('') }}
+            aria-pressed={tender === 'card'}
+          >
+            Card
+          </button>
+        </div>
+
+        {tender === 'cash' && cart.length > 0 && (
+          <div className="cash-panel">
+            <div className="mini-form" style={{ margin: '0 0 8px' }}>
+              <span style={{ color: 'var(--text-3)', fontWeight: 700 }}>Cash received $</span>
+              <input
+                className="mini-input"
+                type="number"
+                step="0.01"
+                value={tendered}
+                onChange={(e) => setTendered(e.target.value)}
+                aria-label="Cash received"
+              />
+            </div>
+            <div className="quick-amts">
+              {quickAmounts(total).map((amt) => (
+                <button
+                  key={amt}
+                  className="quick-amt"
+                  onClick={() => setTendered(String(amt))}
+                >
+                  {amt === total ? 'Exact' : money(amt)}
+                </button>
+              ))}
+            </div>
+            {tenderedNum >= total && (
+              <div className="change-due" aria-live="polite">
+                <span>Change due</span>
+                <span>{money(changeDue)}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {tender === 'card' && cart.length > 0 && (
+          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 4px' }}>
+            Key {money(total)} into the card terminal, then charge here once it approves.
+          </p>
+        )}
+
+        <button className="charge" onClick={charge} disabled={chargeBlocked}>
+          {tender === 'cash' && cart.length > 0 && tenderedNum < total
+            ? `Enter cash received (${money(total)} due)`
+            : `Charge ${money(total)} · ${tender === 'cash' ? 'Cash' : 'Card'}`}
         </button>
       </aside>
 
@@ -297,6 +494,7 @@ export default function Register() {
               if (line) return prev.map((l) => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l))
               return [...prev, { productId: p.id, qty: 1 }]
             })
+            setLastAddedId(p.id)
             showFlash('ok', `${p.name} — ${money(p.price)}`)
           }}
           onCancel={() => {
@@ -383,7 +581,16 @@ function Receipt({
         )}
         <div className="r-line"><span>Tax</span><span>{money(sale.tax)}</span></div>
         <div className="r-line r-total"><span>TOTAL</span><span>{money(sale.total)}</span></div>
-        <div className="r-line"><span>Cash</span><span>{money(sale.total)}</span></div>
+        <div className="r-line">
+          <span>{sale.tender === 'cash' ? 'Cash' : 'Card'}</span>
+          <span>{money(sale.total)}</span>
+        </div>
+        {sale.tender === 'cash' && sale.amountTendered != null && (
+          <>
+            <div className="r-line"><span>Tendered</span><span>{money(sale.amountTendered)}</span></div>
+            <div className="r-line"><span>CHANGE</span><span>{money(round2(sale.amountTendered - sale.total))}</span></div>
+          </>
+        )}
         {sale.idChecked && (
           <div className="r-line"><span>ID VERIFIED (21+)</span><span>✓</span></div>
         )}
